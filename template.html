@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>USDC Redemption Pressure</title>
+<meta name="description" content="What public Ethereum data showed during the SVB weekend, and the same metrics for the last 90 days.">
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --series: #2a78d6;
+  --band: rgba(235,104,52,0.12);
+  --band-ink: #b4461b;
+  --ref: #52514e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series: #3987e5;
+    --band: rgba(217,89,38,0.18);
+    --band-ink: #ec835a;
+    --ref: #c3c2b7;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255,255,255,0.10);
+  --series: #3987e5;
+  --band: rgba(217,89,38,0.18);
+  --band-ink: #ec835a;
+  --ref: #c3c2b7;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 880px; margin: 0 auto; padding: 40px 16px 64px; }
+h1 { font-size: 28px; line-height: 1.2; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 20px; margin: 48px 0 8px; }
+h3 { font-size: 15px; margin: 0 0 2px; }
+p { margin: 0 0 14px; color: var(--ink-2); }
+p.lede { font-size: 18px; color: var(--ink); }
+a { color: var(--series); }
+.byline { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 24px 0 8px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.tile .v { font-size: 30px; font-weight: 650; line-height: 1.1; }
+.tile .l { font-size: 14px; color: var(--ink-2); margin-top: 6px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 16px 8px; margin: 16px 0; }
+.card .sub { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.chart .band-label { fill: var(--band-ink); font-weight: 600; }
+.chart .ref-label { fill: var(--ref); }
+.tip {
+  position: absolute; pointer-events: none; opacity: 0; transition: opacity .08s;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); padding: 8px 10px; font-size: 13px; white-space: nowrap; z-index: 2;
+}
+.tip b { display: block; color: var(--ink); font-weight: 600; }
+.tip span { color: var(--ink-2); }
+details { margin-top: 8px; }
+summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 6px 0; }
+table { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; width: 100%; }
+th, td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--grid); }
+th:first-child, td:first-child { text-align: left; }
+.tablewrap { max-height: 260px; overflow: auto; }
+ul { color: var(--ink-2); padding-left: 20px; }
+li { margin-bottom: 6px; }
+code { font-size: 13px; }
+footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>USDC redemption pressure: the public layer</h1>
+  <div class="byline">Thales Barbosa · onchain data engineering · data through 13 Oct 2026</div>
+
+  <p class="lede">The FSB's October 2026 note on global stablecoins asks authorities to monitor secondary-market liquidity and redemptions. Both are already public on Ethereum. This page reads them for the weekend Silicon Valley Bank failed, then for the last 90 days.</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <h2>The SVB weekend, hour by hour</h2>
+  <p>Friday 10 to Monday 13 March 2023, UTC. The shaded hours are the stretch where USDT drained out of Curve's largest stablecoin pool while the swap price had barely moved.</p>
+
+  <div class="card">
+    <h3>Net USDT flow into Curve 3pool</h3>
+    <p class="sub">Per hour. Below zero means USDT leaving the pool: holders swapping USDC for USDT.</p>
+    <div class="chart" id="c-svb-usdt"></div>
+  </div>
+
+  <div class="card">
+    <h3>USDC → USDT swap price in the pool</h3>
+    <p class="sub">Median rate across swaps selling USDC for USDT, per hour.</p>
+    <div class="chart" id="c-svb-price"></div>
+  </div>
+
+  <div class="card">
+    <h3>Net USDC issuance</h3>
+    <p class="sub">Minted minus burned, per hour. Below zero means net redemptions.</p>
+    <div class="chart" id="c-svb-net"></div>
+  </div>
+
+  <p>Three things the chain shows that a monthly reserve report can't:</p>
+  <ul id="findings"></ul>
+
+  <h2>The last 90 days</h2>
+  <p>The same three metrics, per day. The dashed line on the first chart is the worst single <em>hour</em> of the SVB weekend.</p>
+
+  <div class="card">
+    <h3>Net USDT flow into Curve 3pool</h3>
+    <p class="sub">Per day.</p>
+    <div class="chart" id="c-now-usdt"></div>
+  </div>
+
+  <div class="card">
+    <h3>USDC → USDT swap price in the pool</h3>
+    <p class="sub">Daily median across swaps selling USDC for USDT.</p>
+    <div class="chart" id="c-now-price"></div>
+  </div>
+
+  <div class="card">
+    <h3>Net USDC issuance</h3>
+    <p class="sub">Minted minus burned, per day.</p>
+    <div class="chart" id="c-now-net"></div>
+  </div>
+
+  <h2>What this layer can't see</h2>
+  <ul>
+    <li><b>Who holds the coins, and where.</b> A wallet has no country. The FSB calls this a structural limit, and onchain data doesn't fix it.</li>
+    <li><b>The reserves themselves.</b> Which banks hold the cash, how much of it can move the same day, under which jurisdiction. That sits off-chain with the issuer.</li>
+    <li><b>Hours of cover.</b> The number a supervisor would want is how many hours of redemptions, at the current pace, the issuer's same-day liquidity covers. This page measures the pace. The other half needs the issuer to report liquid reserves privately, and the two can then be joined.</li>
+  </ul>
+
+  <h2>Method</h2>
+  <ul>
+    <li>Source: Google's public Ethereum dataset, <code>bigquery-public-data.crypto_ethereum.token_transfers</code>. One query, run for each window.</li>
+    <li>Mints and burns: USDC transfers from and to the zero address. Ethereum only; USDC on other chains isn't included.</li>
+    <li>Pool flows: USDT transfers into and out of Curve 3pool (<code>0xbebc…f1c7</code>), net per period. They include liquidity adds and removals, not only swaps.</li>
+    <li>Swap price: per transaction, USDT out of the pool divided by USDC into it, for transactions selling more than 1,000 USDC. Transactions with a ratio outside 0.5–1.5 are dropped as multi-leg routes. Median per period.</li>
+  </ul>
+
+  <footer id="foot">Data: Ethereum mainnet via Google BigQuery public datasets.</footer>
+</main>
+
+<script>
+const SVB = /*SVB_DATA*/;
+const NOW = /*NOW_DATA*/;
+
+const num = v => v === "" || v == null ? null : Number(v);
+const parse = rows => rows.map(r => ({
+  t: new Date(r.bucket.replace(" ", "T") + "Z"),
+  minted: num(r.minted), burned: num(r.burned),
+  usdt: num(r.pool_net_usdt), price: num(r.usdc_to_usdt_median), swaps: num(r.usdc_sell_swaps),
+  net: num(r.minted) - num(r.burned)
+}));
+const svbAll = parse(SVB);
+const now = parse(NOW);
+const inRange = (d, a, b) => d.t >= new Date(a) && d.t < new Date(b);
+const svb = svbAll.filter(d => inRange(d, "2023-03-10T00:00:00Z", "2023-03-14T00:00:00Z"));
+
+const usd = v => {
+  const a = Math.abs(v), s = v < 0 ? "−" : "";
+  if (a >= 1e9) return s + "$" + (a / 1e9).toFixed(1) + "B";
+  if (a >= 1e6) return s + "$" + (a / 1e6).toFixed(a >= 1e8 ? 0 : 1) + "M";
+  if (a >= 1e3) return s + "$" + (a / 1e3).toFixed(0) + "K";
+  return s + "$" + a.toFixed(0);
+};
+const px = v => v == null ? "no swaps" : "$" + v.toFixed(4);
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fHour = t => `${DAYS[t.getUTCDay()]} ${t.getUTCDate()} ${MON[t.getUTCMonth()]}, ${String(t.getUTCHours()).padStart(2, "0")}:00 UTC`;
+const fDay = t => `${t.getUTCDate()} ${MON[t.getUTCMonth()]} ${t.getUTCFullYear()}`;
+
+// ---- findings computed from the data, not typed in ----
+const win = svb.filter(d => inRange(d, "2023-03-10T17:00:00Z", "2023-03-10T22:00:00Z"));
+const winOut = -win.reduce((s, d) => s + d.usdt, 0);
+const winMinPrice = Math.min(...win.map(d => d.price));
+const low = svb.filter(d => d.price != null).reduce((a, d) => d.price < a.price ? d : a);
+const worstHour = svb.reduce((a, d) => d.usdt < a.usdt ? d : a);
+const nowWorst = now.reduce((a, d) => d.usdt < a.usdt ? d : a);
+const sum = (rows, k) => rows.reduce((s, d) => s + d[k], 0);
+const fri = svb.filter(d => inRange(d, "2023-03-10T00:00:00Z", "2023-03-11T00:00:00Z"));
+const wknd = svb.filter(d => inRange(d, "2023-03-11T00:00:00Z", "2023-03-13T00:00:00Z"));
+const mon = svb.filter(d => inRange(d, "2023-03-13T12:00:00Z", "2023-03-14T00:00:00Z"));
+const nowPx = now.map(d => d.price).filter(v => v != null);
+const median = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+const baseSwaps = median(svb.filter(d => inRange(d, "2023-03-10T00:00:00Z", "2023-03-10T17:00:00Z")).map(d => d.swaps));
+const swapMult = Math.round(Math.max(...win.map(d => d.swaps)) / baseSwaps);
+
+document.getElementById("tiles").innerHTML = [
+  ["5 hours", `USDT draining from the pool (${usd(winOut)} net) while the swap price held at or above ${px(winMinPrice)}`],
+  [px(low.price), `Lowest hourly swap price, ${fHour(low.t)}`],
+  [usd(sum(wknd, "minted")), `USDC minted all weekend, against ${usd(sum(fri, "minted"))} on the Friday alone`]
+].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+document.getElementById("findings").innerHTML = [
+  `<b>The pool moved before the price.</b> From 17:00 to 22:00 UTC on Friday, ${usd(winOut)} of USDT left the pool and USDC-selling swaps per hour rose to ${swapMult} times the morning's pace, while the median price stayed above ${px(winMinPrice)}. It fell below $0.99 only after midnight.`,
+  `<b>The secondary market ran all weekend, and issuance didn't.</b> Minting fell to ${usd(sum(wknd, "minted"))} across Saturday and Sunday. Large burns came back on Monday from 12:00 UTC, the start of the US business day: ${usd(sum(mon, "burned"))} burned in the following twelve hours. Redemption ran on banking hours while selling ran 24/7, the timing mismatch the FSB describes.`,
+  `<b>The recovery is visible to the hour.</b> The price jumped from ${px(svb.find(d => d.t.getTime() === Date.parse("2023-03-12T21:00:00Z")).price)} to ${px(svb.find(d => d.t.getTime() === Date.parse("2023-03-12T22:00:00Z")).price)} at 22:00 UTC on Sunday, the evening US authorities announced that all SVB deposits would be covered.`
+].map(s => `<li>${s}</li>`).join("");
+
+// ---- minimal SVG chart: one series, one axis, hover crosshair + tooltip ----
+function chart(id, rows, opt) {
+  const el = document.getElementById(id);
+  const tip = document.createElement("div"); tip.className = "tip";
+  const draw = () => {
+    const W = el.clientWidth, H = opt.h || 200, m = { t: 14, r: 12, b: 26, l: 58 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const vals = rows.map(opt.y).filter(v => v != null);
+    let lo = Math.min(...vals, opt.ref ?? Infinity, opt.zero ? 0 : Infinity);
+    let hi = Math.max(...vals, opt.ref ?? -Infinity, opt.zero ? 0 : -Infinity);
+    if (opt.domain) [lo, hi] = [Math.min(lo, opt.domain[0]), Math.max(hi, opt.domain[1])];
+    const pad = (hi - lo) * 0.06 || 1; lo -= opt.zero && lo === 0 ? 0 : pad; hi += pad;
+    const n = rows.length, bw = iw / n;
+    const X = i => m.l + bw * i + bw / 2;
+    const Y = v => m.t + ih - (v - lo) / (hi - lo) * ih;
+    const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map(k => k * mag).find(s => s >= raw);
+    const tickVals = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-12; v += step) tickVals.push(v);
+    let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${opt.label}">`;
+    if (opt.band) {
+      const i0 = rows.findIndex(d => d.t >= new Date(opt.band[0])), i1 = rows.findIndex(d => d.t >= new Date(opt.band[1]));
+      s += `<rect x="${m.l + bw * i0}" y="${m.t}" width="${bw * (i1 - i0)}" height="${ih}" fill="var(--band)"/>`;
+      s += `<text class="band-label" x="${m.l + bw * i1 + 4}" y="${m.t + 10}">${opt.bandLabel}</text>`;
+    }
+    for (const v of tickVals) {
+      const y = Y(v);
+      s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
+      s += `<text x="${m.l - 8}" y="${y + 4}" text-anchor="end">${opt.fmtAxis(v)}</text>`;
+    }
+    if (opt.zero && lo < 0) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--axis)" stroke-width="1"/>`;
+    rows.forEach((d, i) => { const lab = opt.xTick(d, i, W); if (lab) s += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle">${lab}</text>`; });
+    if (opt.type === "bar") {
+      const w = Math.max(1, bw - 2), r = Math.min(4, w / 2);
+      rows.forEach((d, i) => {
+        const v = opt.y(d); if (v == null || v === 0) return;
+        const y0 = Y(0), y1 = Y(v), h = Math.abs(y1 - y0), x = X(i) - w / 2;
+        if (h < 0.5) return;
+        const rr = Math.min(r, h);
+        // rounded at the data end, square at the baseline
+        s += v > 0
+          ? `<path d="M${x},${y0} V${y1 + rr} Q${x},${y1} ${x + rr},${y1} H${x + w - rr} Q${x + w},${y1} ${x + w},${y1 + rr} V${y0} Z" fill="var(--series)"/>`
+          : `<path d="M${x},${y0} V${y1 - rr} Q${x},${y1} ${x + rr},${y1} H${x + w - rr} Q${x + w},${y1} ${x + w},${y1 - rr} V${y0} Z" fill="var(--series)"/>`;
+      });
+    } else {
+      let dpath = "", pen = false;
+      rows.forEach((d, i) => { const v = opt.y(d); if (v == null) { pen = false; return; } dpath += (pen ? "L" : "M") + X(i) + "," + Y(v); pen = true; });
+      s += `<path d="${dpath}" fill="none" stroke="var(--series)" stroke-width="2" stroke-linejoin="round"/>`;
+    }
+    if (opt.ref != null) {
+      s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(opt.ref)}" y2="${Y(opt.ref)}" stroke="var(--ref)" stroke-width="1" stroke-dasharray="4 4"/>`;
+      s += opt.refLeft
+        ? `<text class="ref-label" x="${m.l + 4}" y="${Y(opt.ref) - 6}" text-anchor="start">${opt.refLabel}</text>`
+        : `<text class="ref-label" x="${W - m.r}" y="${Y(opt.ref) + (opt.refBelow ? 14 : -6)}" text-anchor="end">${opt.refLabel}</text>`;
+    }
+    s += `<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="var(--axis)" stroke-width="1" opacity="0"/>`;
+    s += `<circle class="dot" r="4" fill="var(--series)" stroke="var(--surface)" stroke-width="2" opacity="0"/>`;
+    s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/></svg>`;
+    el.innerHTML = s; el.appendChild(tip);
+    const svg = el.querySelector("svg"), xh = svg.querySelector(".xh"), dot = svg.querySelector(".dot");
+    const move = ev => {
+      const r = svg.getBoundingClientRect(), mx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+      const i = Math.max(0, Math.min(n - 1, Math.floor((mx - m.l) / bw))), d = rows[i], v = opt.y(d);
+      xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.setAttribute("opacity", 1);
+      if (v != null) { dot.setAttribute("cx", X(i)); dot.setAttribute("cy", Y(v)); dot.setAttribute("opacity", opt.type === "line" ? 1 : 0); }
+      tip.innerHTML = `<b>${opt.fmtVal(v)}</b><span>${opt.fmtT(d.t)}</span>`;
+      tip.style.opacity = 1;
+      const tx = Math.min(Math.max(X(i) + 12, 0), W - tip.offsetWidth - 4);
+      tip.style.left = (X(i) + 12 + tip.offsetWidth > W ? X(i) - tip.offsetWidth - 12 : tx) + "px";
+      tip.style.top = "4px";
+    };
+    const out = () => { tip.style.opacity = 0; xh.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); };
+    svg.addEventListener("mousemove", move); svg.addEventListener("touchmove", move, { passive: true });
+    svg.addEventListener("mouseleave", out); svg.addEventListener("touchend", out);
+  };
+  draw();
+  let tm; new ResizeObserver(() => { clearTimeout(tm); tm = setTimeout(draw, 80); }).observe(el);
+  // table view
+  const det = document.createElement("details");
+  det.innerHTML = `<summary>Show data table</summary><div class="tablewrap"><table><thead><tr><th>${opt.tableT}</th><th>${opt.tableV}</th></tr></thead><tbody>${
+    rows.map(d => `<tr><td>${opt.fmtT(d.t)}</td><td>${opt.fmtVal(opt.y(d))}</td></tr>`).join("")}</tbody></table></div>`;
+  el.after(det);
+}
+
+const svbTick = (d, i, W) => d.t.getUTCHours() === 0 ? `${DAYS[d.t.getUTCDay()]} ${d.t.getUTCDate()}` : (d.t.getUTCHours() === 12 && W >= 560 ? "12:00" : "");
+const nowTick = (d, i) => d.t.getUTCDate() === 1 ? `${MON[d.t.getUTCMonth()]} 1` : (d.t.getUTCDate() === 15 ? `${MON[d.t.getUTCMonth()]} 15` : "");
+const band = ["2023-03-10T17:00:00Z", "2023-03-10T22:00:00Z"];
+const common = { zero: true, type: "bar", fmtAxis: usd, fmtVal: v => usd(v) };
+
+chart("c-svb-usdt", svb, { ...common, label: "Net USDT flow into Curve 3pool per hour, SVB weekend", y: d => d.usdt, xTick: svbTick, fmtT: fHour, band, bandLabel: "pool draining, price flat", tableT: "Hour (UTC)", tableV: "Net USDT into pool" });
+chart("c-svb-price", svb, { type: "line", label: "USDC to USDT median swap price per hour, SVB weekend", y: d => d.price, xTick: svbTick, fmtT: fHour, band, bandLabel: "", fmtAxis: v => "$" + v.toFixed(3), fmtVal: px, ref: 1, refLabel: "$1.00", refLeft: true, tableT: "Hour (UTC)", tableV: "Median price" });
+chart("c-svb-net", svb, { ...common, label: "Net USDC issuance per hour, SVB weekend", y: d => d.net, xTick: svbTick, fmtT: fHour, band, bandLabel: "", tableT: "Hour (UTC)", tableV: "Minted − burned" });
+chart("c-now-usdt", now, { ...common, label: "Net USDT flow into Curve 3pool per day, last 90 days", y: d => d.usdt, xTick: nowTick, fmtT: fDay, ref: worstHour.usdt, refLabel: `SVB's worst hour: ${usd(worstHour.usdt)}`, refBelow: true, tableT: "Day", tableV: "Net USDT into pool" });
+chart("c-now-price", now, { type: "line", label: "USDC to USDT median swap price per day, last 90 days", y: d => d.price, xTick: nowTick, fmtT: fDay, fmtAxis: v => "$" + v.toFixed(4), fmtVal: px, ref: 1, refLabel: "$1.00", refLeft: true, tableT: "Day", tableV: "Median price" });
+chart("c-now-net", now, { ...common, label: "Net USDC issuance per day, last 90 days", y: d => d.net, xTick: nowTick, fmtT: fDay, tableT: "Day", tableV: "Minted − burned" });
+
+document.getElementById("foot").innerHTML += ` In the last 90 days the worst day moved ${usd(nowWorst.usdt)} of USDT (${fDay(nowWorst.t)}), and the daily swap price stayed between ${px(Math.min(...nowPx))} and ${px(Math.max(...nowPx))}.`;
+</script>
+</body>
+</html>
